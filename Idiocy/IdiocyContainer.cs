@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -6,29 +7,52 @@ namespace Idiocy
 {
     public class IdiocyContainer
     {
-        private readonly Dictionary<Type, Func<object>> _typeRegistry =
-            new Dictionary<Type, Func<object>>();
+        private readonly Dictionary<Type, ComponentRegistration> _componentRegistry =
+            new Dictionary<Type, ComponentRegistration>();
 
-        public void Register<TService, TComponent>() where TComponent : TService
+        private readonly ConcurrentDictionary<Type,object> _singletons =
+            new ConcurrentDictionary<Type, object>();
+
+        /// <summary>
+        /// Registers a component and the service it provides
+        /// </summary>
+        public void Register<TComponent, TService>(Lifetime? lifetime = Lifetime.Transient) where TComponent : TService
         {
-            _typeRegistry.Add(typeof(TService), () => ResolveComponent<TComponent>());
+            _componentRegistry.Add(
+                typeof(TService),
+                new ComponentRegistration(() => ActivateComponent<TComponent>(), lifetime));
         }
 
+
+        /// <summary>
+        /// Retrieve a service of the requested type from the IoC container
+        /// </summary>
         public TService Resolve<TService>()
         {
             return (TService)Resolve(typeof(TService));
         }
 
-        private object Resolve(Type serviceType)
+
+        /// <summary>
+        /// Retrieve a service of the requested type from the IoC container
+        /// </summary>
+        public object Resolve(Type serviceType)
         {
-            Func<object> resolver;
-            if (!_typeRegistry.TryGetValue(serviceType, out resolver))
+            ComponentRegistration componentRegistration;
+            if (!_componentRegistry.TryGetValue(serviceType, out componentRegistration))
                 throw new ServiceNotRegisteredException("The requested service '" + serviceType.FullName + "' has no registered components.");
 
-            return resolver();
+            if (componentRegistration.ComponentLifetime == Lifetime.Singleton)
+                return _singletons.GetOrAdd(serviceType, t => componentRegistration.Activator());
+
+            return componentRegistration.Activator();
         }
 
-        private TComponent ResolveComponent<TComponent>()
+
+        /// <summary>
+        /// Creates a component of the specified type
+        /// </summary>
+        private TComponent ActivateComponent<TComponent>()
         {
             var constructor = typeof(TComponent).GetConstructors().Single();
             var parameters = constructor.GetParameters().Select(p => Resolve(p.ParameterType));

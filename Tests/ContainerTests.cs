@@ -16,7 +16,7 @@ namespace Tests
         public void Resolve_Concrete_Type()
         {
             var container = new IdiocyContainer();
-            container.Register<IService, Component>();
+            container.Register<Component, IService>();
             var component = container.Resolve<IService>();
             Assert.AreEqual(typeof(Component), component.GetType());
         }
@@ -26,8 +26,8 @@ namespace Tests
         public void Resolve_Concrete_Type_With_Params()
         {
             var container = new IdiocyContainer();
-            container.Register<IService, Component>();
-            container.Register<IServiceWithParams, ComponentWithParams>();
+            container.Register<Component, IService>();
+            container.Register<ComponentWithParams, IServiceWithParams>();
             var component = container.Resolve<IServiceWithParams>();
 
             Assert.AreEqual(typeof(ComponentWithParams), component.GetType());
@@ -41,6 +41,32 @@ namespace Tests
         {
             var container = new IdiocyContainer();
             var component = container.Resolve<IServiceWithParams>();
+        }
+
+
+        [Test]
+        public void Transient_Instances_Are_Unique()
+        {
+            var container = new IdiocyContainer();
+            container.Register<Component, IService>();
+            
+            var service1 = container.Resolve<IService>();
+            var service2 = container.Resolve<IService>();
+
+            Assert.AreNotSame(service1, service2);
+        }
+
+
+        [Test]
+        public void Singleton_Instances_Are_Same()
+        {
+            var container = new IdiocyContainer();
+            container.Register<Component, IService>(Lifetime.Singleton);
+
+            var service1 = container.Resolve<IService>();
+            var service2 = container.Resolve<IService>();
+
+            Assert.AreSame(service1, service2);
         }
 
 
@@ -78,6 +104,33 @@ namespace Tests
             var component = container.Resolve<IServiceWithParams>();
         }
 
+
+        [Test]
+        public void Autofac_Transient_Instances_Are_Unique()
+        {
+            var builder = new ContainerBuilder();
+            builder.RegisterType<Component>().As<IService>().InstancePerDependency();
+            var container = builder.Build();
+
+            var service1 = container.Resolve<IService>();
+            var service2 = container.Resolve<IService>();
+
+            Assert.AreNotSame(service1, service2);
+        }
+
+
+        [Test]
+        public void Autofac_Singleton_Instances_Are_Same()
+        {
+            var builder = new ContainerBuilder();
+            builder.RegisterType<Component>().As<IService>().SingleInstance();
+            var container = builder.Build();
+
+            var service1 = container.Resolve<IService>();
+            var service2 = container.Resolve<IService>();
+
+            Assert.AreSame(service1, service2);
+        }
     }
 
 
